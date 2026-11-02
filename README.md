@@ -18,11 +18,11 @@ and double-tap a section of the trackpad to run anything you like.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-dark.png">
-  <img src="docs/images/menu-light.png" width="396" alt="The Ledge menu: a live map of the trackpad with brightness at 53% and volume at 70%, and toggles for haptics, quick mute, tap sections and the media strip">
+  <img src="docs/images/menu-light.png" width="396" align="top" alt="The Ledge menu: a live map of the trackpad with brightness at 53% and volume at 70%, and toggles for haptics, quick mute, tap sections and the media strip">
 </picture>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/settings-dark.png">
-  <img src="docs/images/settings-light.png" width="396" alt="Ledge settings: what each edge controls, active area, modifier key, pointer freeze, page-scroll blocking and step size">
+  <img src="docs/images/settings-light.png" width="396" align="top" alt="Ledge settings: what each edge controls, active area, modifier key, pointer freeze, page-scroll blocking and step size">
 </picture>
 
 </div>
@@ -42,7 +42,7 @@ no network code at all.
 
 ## Features
 
-| | |
+| Feature | What it does |
 |---|---|
 | **Edge sliders** | Left edge for brightness and right edge for volume by default. Either edge can control brightness, volume, the keyboard backlight or nothing. Slide with one finger or two. |
 | **Fast and smooth** | A slide starts after 1 mm of movement and moves in 1% steps, with a haptic tick every sixteenth like the brightness keys. Prefer coarser steps? Pick quarter or keyboard steps. Hold **⇧⌥** to slide 4× finer. |
