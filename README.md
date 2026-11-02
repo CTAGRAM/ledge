@@ -9,10 +9,15 @@
 Slide along an edge to change a level, swipe the bottom to skip a track,<br>
 and double-tap a section of the trackpad to run anything you like.
 
+[![Latest release](https://img.shields.io/github/v/release/CTAGRAM/ledge?label=release&color=0a84ff)](https://github.com/CTAGRAM/ledge/releases/latest)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white)](#install)
 [![Swift 5.9](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 [![Price: free](https://img.shields.io/badge/price-free-0a84ff)](#install)
+
+### [Download Ledge for Mac](https://github.com/CTAGRAM/ledge/releases/latest/download/Ledge.zip)
+
+<sub>Free · Apple silicon and Intel · macOS 14 or later · [Install steps](#install)</sub>
 
 <br>
 
@@ -60,8 +65,32 @@ no network code at all.
 
 ## Install
 
-**Requirements:** macOS 14 Sonoma or later, a Mac with a trackpad (built-in or Magic Trackpad), and
-Xcode or the Command Line Tools (`xcode-select --install`) to build it.
+**Requirements:** macOS 14 Sonoma or later, and a Mac with a trackpad (built-in or Magic Trackpad).
+One download runs on both Apple silicon and Intel Macs.
+
+### Download
+
+1. Download **[Ledge.zip](https://github.com/CTAGRAM/ledge/releases/latest/download/Ledge.zip)** from
+   the [latest release](https://github.com/CTAGRAM/ledge/releases/latest) and open it.
+2. Drag **Ledge** into your **Applications** folder, then open it.
+3. Ledge isn't notarized by Apple, which needs a paid developer account. The first time you open it,
+   macOS says it can't verify the app. Close that message, open **System Settings › Privacy &
+   Security**, scroll down to the note about Ledge and click **Open Anyway**. You only do this once.
+
+<details>
+<summary>Prefer the Terminal for step 3?</summary>
+<br>
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Ledge.app
+open /Applications/Ledge.app
+```
+
+</details>
+
+### Build from source
+
+Needs Xcode or the Command Line Tools (`xcode-select --install`).
 
 ```bash
 git clone https://github.com/CTAGRAM/ledge.git
@@ -152,12 +181,12 @@ never counts as a tap.
 ## Troubleshooting
 
 <details>
-<summary><b>The menu says "Needs Access" after I rebuilt Ledge</b></summary>
+<summary><b>The menu says "Needs Access" after I updated or rebuilt Ledge</b></summary>
 <br>
 
-macOS ties the Accessibility grant to the app's code signature. The build script signs ad hoc, and
-that signature changes with every build. Remove Ledge from System Settings › Privacy & Security ›
-Accessibility and add it again.
+macOS ties the Accessibility grant to the app's code signature. Ledge is signed ad hoc, and that
+signature changes with every build, including each new release. Remove Ledge from System Settings ›
+Privacy & Security › Accessibility and add it again.
 
 To keep the grant across builds, create a signing certificate once: open Keychain Access, choose
 Certificate Assistant › Create a Certificate…, name it something like `Ledge Local` and set the
