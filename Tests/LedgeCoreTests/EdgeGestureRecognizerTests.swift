@@ -318,6 +318,106 @@ final class EdgeGestureRecognizerTests: XCTestCase {
             XCTAssertTrue(r.minX >= 0 && r.maxX <= 1 && r.minY >= 0 && r.maxY <= 1 && r.minX < r.maxX && r.minY < r.maxY, "\(zone)")
         }
     }
+
+    // MARK: Top edge
+
+    func testTopLeftSlidesRightToRaise() {
+        let r = recognizer { $0.layout = .top }
+        let events = play(r, [(0.1, 0.97), (0.12, 0.97), (0.3, 0.96)])
+        XCTAssertEqual(events.first, .slideBegan(.left))
+        XCTAssertEqual(events.last, .slideEnded(.left))
+        XCTAssertEqual(slideTotal(events), 20, accuracy: 0.001)
+    }
+
+    func testTopRightSlidesLeftToLower() {
+        let r = recognizer { $0.layout = .top }
+        let events = play(r, [(0.8, 0.96), (0.78, 0.96), (0.65, 0.97)])
+        XCTAssertEqual(events.first, .slideBegan(.right))
+        XCTAssertEqual(slideTotal(events), -15, accuracy: 0.001)
+    }
+
+    func testTopGapIsEmptySpace() {
+        let r = recognizer { $0.layout = .top }
+        XCTAssertEqual(play(r, [(0.5, 0.97), (0.55, 0.97), (0.6, 0.97)]), [])
+    }
+
+    func testTopLayoutLeavesSideEdgesAlone() {
+        let r = recognizer { $0.layout = .top }
+        XCTAssertEqual(play(r, [(0.98, 0.3), (0.98, 0.4), (0.98, 0.5)]), [])
+    }
+
+    func testTopStripIgnoresVerticalMovement() {
+        let r = recognizer { $0.layout = .top }
+        XCTAssertEqual(play(r, [(0.2, 0.97), (0.2, 0.95), (0.2, 0.9), (0.21, 0.8)]), [])
+    }
+
+    func testTwoFingersOnTopStripAreAScroll() {
+        let r = recognizer { $0.layout = .top }
+        var events = r.process([Touch(id: 1, x: 0.15, y: 0.96), Touch(id: 2, x: 0.25, y: 0.96)], at: 0)
+        events += r.process([Touch(id: 1, x: 0.15, y: 0.9), Touch(id: 2, x: 0.25, y: 0.9)], at: 0.02)
+        events += r.process([Touch(id: 1, x: 0.25, y: 0.9), Touch(id: 2, x: 0.35, y: 0.9)], at: 0.04)
+        XCTAssertEqual(events, [])
+        XCTAssertFalse(r.blocksScrolling)
+    }
+
+    func testSecondFingerOnTopStripCancelsPendingSlide() {
+        let r = recognizer { $0.layout = .top }
+        XCTAssertEqual(r.process([Touch(id: 1, x: 0.2, y: 0.96)], at: 0), [])
+        XCTAssertTrue(r.blocksScrolling)
+        XCTAssertEqual(r.process([Touch(id: 1, x: 0.2, y: 0.96), Touch(id: 2, x: 0.3, y: 0.95)], at: 0.03), [])
+        XCTAssertFalse(r.blocksScrolling)
+        XCTAssertEqual(r.process([Touch(id: 1, x: 0.25, y: 0.96), Touch(id: 2, x: 0.35, y: 0.95)], at: 0.05), [])
+    }
+
+    func testDoubleTapStillWorksOnTopStrip() {
+        let r = recognizer { $0.layout = .top }
+        XCTAssertEqual(play(r, id: 1, [(0.95, 0.97)], start: 0), [])
+        XCTAssertEqual(play(r, id: 2, [(0.95, 0.97)], start: 0.15), [.doubleTap(.topRight)])
+    }
+
+    func testTopSliderRects() {
+        var config = GestureConfig()
+        config.layout = .top
+        let left = EdgeGestureRecognizer.sliderRect(.left, config: config, on: surface)
+        let right = EdgeGestureRecognizer.sliderRect(.right, config: config, on: surface)
+        XCTAssertEqual(left.minX, 0)
+        XCTAssertEqual(left.maxX, 0.38, accuracy: 1e-9)
+        XCTAssertEqual(right.minX, 0.62, accuracy: 1e-9)
+        XCTAssertEqual(right.maxX, 1)
+        XCTAssertEqual(left.minY, 0.93, accuracy: 1e-9)
+        XCTAssertEqual(left.maxY, 1)
+    }
+
+    // MARK: Typing
+
+    func testTouchesRightAfterTypingAreIgnored() {
+        let r = recognizer()
+        r.noteKeyDown(at: 1.0)
+        XCTAssertEqual(play(r, [(0.98, 0.3), (0.98, 0.4), (0.98, 0.5)], start: 1.2), [])
+        XCTAssertEqual(play(r, id: 2, [(0.98, 0.3), (0.98, 0.4)], start: 2.0).first, .slideBegan(.right))
+    }
+
+    func testKeyPressDropsAThumbRestingOnTheEdge() {
+        let r = recognizer()
+        XCTAssertEqual(r.process([Touch(id: 1, x: 0.02, y: 0.2)], at: 0), [])
+        r.noteKeyDown(at: 0.5)
+        XCTAssertEqual(play(r, [(0.02, 0.25), (0.02, 0.4)], start: 2.0), [])
+    }
+
+    func testSlideInProgressSurvivesAKeyPress() {
+        let r = recognizer()
+        var events = play(r, [(0.98, 0.3), (0.98, 0.4)], lift: false)
+        r.noteKeyDown(at: 0.05)
+        events += play(r, [(0.98, 0.5)], start: 0.06)
+        XCTAssertEqual(events.last, .slideEnded(.right))
+        XCTAssertEqual(slideTotal(events), 20, accuracy: 0.001)
+    }
+
+    func testTypingGuardCanBeTurnedOff() {
+        let r = recognizer { $0.ignoreWhileTyping = false }
+        r.noteKeyDown(at: 1.0)
+        XCTAssertEqual(play(r, [(0.98, 0.3), (0.98, 0.4)], start: 1.1).first, .slideBegan(.right))
+    }
 }
 
 final class StepAccumulatorTests: XCTestCase {

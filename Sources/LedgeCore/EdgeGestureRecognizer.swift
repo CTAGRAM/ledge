@@ -2,21 +2,26 @@ import Foundation
 
 /// Which edge gestures are switched on and how big the zones are.
 public struct GestureConfig: Equatable {
-    /// Width of the left/right slide zones as a fraction of the surface width.
+    public var layout: SliderLayout = .sides
+    /// Thickness of the slide zones as a fraction of the surface width (the top strip is as thick in millimetres).
     public var edgeWidth: Double = 0.07
+    /// Side edges only: how far up the edge a slide may start.
     public var activeArea: ActiveArea = .full
     public var leftEdge = true
     public var rightEdge = true
     public var mediaStrip = true
     /// Sections that react to a double-tap.
     public var tapZones: Set<TapZone> = [.topRight]
+    /// Touches that land just after a key press are resting palms or thumbs, not gestures.
+    public var ignoreWhileTyping = true
 
     public init() {}
 }
 
 public enum GestureEvent: Equatable {
     case slideBegan(Side)
-    /// Vertical travel since the previous event, in millimetres. Positive is up.
+    /// Travel along the slider since the previous event, in millimetres. Positive is up on the
+    /// side edges and right on the top edge.
     case slideMoved(Side, deltaMM: Double)
     case slideEnded(Side)
     case mediaSwipe(forward: Bool)
@@ -27,9 +32,9 @@ public enum GestureEvent: Equatable {
 ///
 /// A gesture starts from a finger landing in a zone. Palms (recognised by their
 /// contact size) are ignored completely, and fingers that were already resting on
-/// the trackpad don't get in the way. Two fingers landing together on the same edge
-/// slide as one. Anything else – pointing, scrolling, multi-finger gestures – is
-/// left alone.
+/// the trackpad don't get in the way, nor do fingers that land while you type. Two
+/// fingers landing together on the same side edge slide as one. Anything else –
+/// pointing, scrolling, multi-finger gestures – is left alone.
 public final class EdgeGestureRecognizer {
     public struct Tuning {
         public var slideStartMM = 1.0
@@ -49,6 +54,10 @@ public final class EdgeGestureRecognizer {
         /// Fingertips measure roughly 6–12 on the sensor's contact ellipse; palms are much larger.
         public var palmMajorAxis = 16.0
         public var palmSize = 2.2
+        /// Empty space between the two halves of the top strip.
+        public var topGapMM = 24.0
+        /// How long after a key press new touches are ignored.
+        public var typingGuard = 0.75
         public init() {}
     }
 
@@ -98,6 +107,7 @@ public final class EdgeGestureRecognizer {
     private var firstSeen: [Int32: Double] = [:]
     private var lastTap: (zone: TapZone, time: Double)?
     private var clickGuardUntil = 0.0
+    private var lastKeyDown = -Double.infinity
 
     /// True while a slide is running; the app freezes the pointer during that time.
     public var isSliding: Bool { slidingEdge != nil }
@@ -113,7 +123,7 @@ public final class EdgeGestureRecognizer {
     public var isTracking: Bool { tracked != nil }
 
     /// True while scrolling should be held back: during a slide, or while a finger on a
-    /// side edge may still become one (otherwise two fingers on the edge scroll the page).
+    /// slider may still become one (otherwise two fingers on a side edge scroll the page).
     public var blocksScrolling: Bool {
         if isSliding { return true }
         guard let tracked, tracked.isPending else { return false }
@@ -145,6 +155,13 @@ public final class EdgeGestureRecognizer {
     /// Called for every mouse-down; a physical press in a bottom section is never treated as a tap.
     public func noteMouseDown(at time: Double) {
         tracked?.physicallyClicked = true
+    }
+
+    /// Called for every key press. A finger waiting to become a gesture is only a resting thumb or
+    /// palm, and fingers landing in the next moment are too.
+    public func noteKeyDown(at time: Double) {
+        lastKeyDown = time
+        if config.ignoreWhileTyping, let tracked, tracked.isPending { abandon(tracked) }
     }
 
     // MARK: Frames
@@ -204,6 +221,20 @@ public final class EdgeGestureRecognizer {
         }
     }
 
+    /// A slider's rectangle in normalized coordinates (y up), shared with the UI's trackpad map.
+    public static func sliderRect(_ side: Side, config: GestureConfig, on surface: SurfaceSize,
+                                  tuning: Tuning = Tuning()) -> (minX: Double, minY: Double, maxX: Double, maxY: Double) {
+        switch config.layout {
+        case .sides:
+            let top = config.activeArea.fraction
+            return side == .left ? (0, 0, config.edgeWidth, top) : (1 - config.edgeWidth, 0, 1, top)
+        case .top:
+            let depth = min(0.3, config.edgeWidth * surface.widthMM / surface.heightMM)
+            let halfGap = tuning.topGapMM / 2 / surface.widthMM
+            return side == .left ? (0, 1 - depth, 0.5 - halfGap, 1) : (0.5 + halfGap, 1 - depth, 1, 1)
+        }
+    }
+
     private func tapZone(at touch: Touch) -> TapZone? {
         TapZone.allCases.first { zone in
             let r = Self.rect(of: zone, on: surface, tuning: tuning)
@@ -211,15 +242,29 @@ public final class EdgeGestureRecognizer {
         }
     }
 
-    private func inEdge(_ side: Side, _ touch: Touch) -> Bool {
-        side == .left ? touch.x <= config.edgeWidth : touch.x >= 1 - config.edgeWidth
+    /// Whether a touch is on a slider's strip. On the side edges that is anywhere along the edge;
+    /// the active area only limits where a slide may start.
+    private func onSlider(_ side: Side, _ touch: Touch) -> Bool {
+        switch config.layout {
+        case .sides:
+            return side == .left ? touch.x <= config.edgeWidth : touch.x >= 1 - config.edgeWidth
+        case .top:
+            let r = Self.sliderRect(side, config: config, on: surface, tuning: tuning)
+            return touch.x >= r.minX && touch.x <= r.maxX && touch.y >= r.minY
+        }
+    }
+
+    /// Travel along the slider's axis and across it, in millimetres.
+    private func alongAndAcross(dx: Double, dy: Double) -> (along: Double, across: Double) {
+        let dxMM = dx * surface.widthMM, dyMM = dy * surface.heightMM
+        return config.layout == .top ? (dxMM, dyMM) : (dyMM, dxMM)
     }
 
     private func kinds(for touch: Touch) -> Set<Kind> {
         var kinds = Set<Kind>()
-        let inActiveArea = touch.y <= config.activeArea.fraction
-        if config.leftEdge, inActiveArea, inEdge(.left, touch) { kinds.insert(.slide(.left)) }
-        if config.rightEdge, inActiveArea, inEdge(.right, touch) { kinds.insert(.slide(.right)) }
+        let mayStart = config.layout == .top || touch.y <= config.activeArea.fraction
+        if config.leftEdge, mayStart, onSlider(.left, touch) { kinds.insert(.slide(.left)) }
+        if config.rightEdge, mayStart, onSlider(.right, touch) { kinds.insert(.slide(.right)) }
         let bottomStrip = min(0.2, max(0.04, config.edgeWidth * surface.widthMM / surface.heightMM))
         if config.mediaStrip, touch.y <= bottomStrip { kinds.insert(.swipe) }
         if let zone = tapZone(at: touch), config.tapZones.contains(zone) { kinds.insert(.tap(zone)) }
@@ -279,9 +324,10 @@ public final class EdgeGestureRecognizer {
                     return events
                 }
             }
-            if let side = current.slideSides.first, abs(dyMM) >= tuning.slideStartMM, abs(dyMM) >= abs(dxMM) {
+            let travel = alongAndAcross(dx: touch.x - current.startX, dy: touch.y - current.startY)
+            if let side = current.slideSides.first, abs(travel.along) >= tuning.slideStartMM, abs(travel.along) >= abs(travel.across) {
                 current.mode = .sliding(side)
-                events += [.slideBegan(side), .slideMoved(side, deltaMM: dyMM)]
+                events += [.slideBegan(side), .slideMoved(side, deltaMM: travel.along)]
             } else if current.kinds.contains(.swipe), abs(dxMM) >= tuning.slideStartMM, abs(dxMM) > abs(dyMM) {
                 current.mode = .swiping(fired: false)
                 events += swipe(&current, dxMM: dxMM)
@@ -290,7 +336,7 @@ public final class EdgeGestureRecognizer {
                 return events
             }
         case .sliding(let edge):
-            let delta = (touch.y - current.lastY) * surface.heightMM
+            let delta = alongAndAcross(dx: touch.x - current.lastX, dy: touch.y - current.lastY).along
             if delta != 0 { events.append(.slideMoved(edge, deltaMM: delta)) }
         case .swiping:
             events += swipe(&current, dxMM: dxMM)
@@ -311,7 +357,7 @@ public final class EdgeGestureRecognizer {
         // A slide that lost its finger picks up a finger landing close by.
         if let lostSlide = lost {
             let last = (x: lostSlide.slide.lastX, y: lostSlide.slide.lastY)
-            if let near = fresh.first(where: { distanceMM(from: last, to: $0) <= tuning.reacquireMM || inEdge(lostSlide.edge, $0) }) {
+            if let near = fresh.first(where: { distanceMM(from: last, to: $0) <= tuning.reacquireMM || onSlider(lostSlide.edge, $0) }) {
                 var resumed = lostSlide.slide
                 resumed.id = near.id
                 resumed.lastX = near.x
@@ -327,11 +373,12 @@ public final class EdgeGestureRecognizer {
         }
 
         if var current = tracked {
-            // Fingers landing on the same edge as a slide join it.
+            // Fingers landing on the same edge as a slide join it. The top strip is slid with one
+            // finger; a second finger there is the start of a scroll.
             let sides = current.slideSides
-            let joining = fresh.filter { finger in
-                if case .sliding(let side) = current.mode { return inEdge(side, finger) }
-                return current.isPending && sides.contains { inEdge($0, finger) }
+            let joining = config.layout == .top ? [] : fresh.filter { finger in
+                if case .sliding(let side) = current.mode { return onSlider(side, finger) }
+                return current.isPending && sides.contains { onSlider($0, finger) }
             }
             current.siblings.formUnion(joining.map(\.id))
             tracked = current
@@ -357,7 +404,7 @@ public final class EdgeGestureRecognizer {
             .filter { !freshIDs.contains($0.id) }
             .allSatisfy { time - (firstSeen[$0.id] ?? time) >= tuning.restingAfter }
         let primary = fresh[0]
-        let sameEdge = Side.allCases.contains { side in fresh.allSatisfy { inEdge(side, $0) } }
+        let sameEdge = config.layout == .sides && Side.allCases.contains { side in fresh.allSatisfy { onSlider(side, $0) } }
         if othersResting, fresh.count == 1 || sameEdge {
             begin(primary, siblings: Set(fresh.dropFirst().map(\.id)), at: time)
         } else {
@@ -372,7 +419,8 @@ public final class EdgeGestureRecognizer {
             // Two fingers together only make sense as a slide.
             kinds = kinds.filter { if case .slide = $0 { return true } else { return false } }
         }
-        guard !kinds.isEmpty, gesturesAllowed() else {
+        let typing = config.ignoreWhileTyping && time - lastKeyDown < tuning.typingGuard
+        guard !kinds.isEmpty, !typing, gesturesAllowed() else {
             ignored.insert(touch.id)
             ignored.formUnion(siblings)
             return

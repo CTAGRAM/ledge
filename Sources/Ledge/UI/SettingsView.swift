@@ -49,11 +49,18 @@ struct SettingsView: View {
 
     @ViewBuilder
     private func rows(_ settings: Settings) -> some View {
+        let top = settings.sliderLayout == .top
         SectionHeader(title: "Edges")
-        SettingRow(symbol: "rectangle.lefthalf.inset.filled", title: "Left Edge") {
+        SettingRow(symbol: top ? "slider.horizontal.3" : "slider.vertical.3", title: "Sliders",
+                   subtitle: top ? "Like the Touch Bar" : "Up and down the sides") {
+            RowPicker(selection: $prefs.settings.sliderLayout, options: SliderLayout.allCases, title: \.title)
+        }
+        SettingRow(symbol: top ? "rectangle.inset.topleft.filled" : "rectangle.lefthalf.inset.filled",
+                   title: top ? "Top Left" : "Left Edge") {
             RowPicker(selection: $prefs.settings.leftAction, options: edgeOptions, title: \.title)
         }
-        SettingRow(symbol: "rectangle.righthalf.inset.filled", title: "Right Edge") {
+        SettingRow(symbol: top ? "rectangle.inset.topright.filled" : "rectangle.righthalf.inset.filled",
+                   title: top ? "Top Right" : "Right Edge") {
             RowPicker(selection: $prefs.settings.rightAction, options: edgeOptions, title: \.title)
         }
         SettingRow(symbol: "arrow.left.arrow.right", title: "Swap Sides",
@@ -65,9 +72,15 @@ struct SettingsView: View {
             }
             .controlSize(.small)
         }
-        SettingRow(symbol: "rectangle.bottomhalf.inset.filled", title: "Active Area",
-                   subtitle: "Where a slide may start", active: settings.activeArea != .full) {
-            RowPicker(selection: $prefs.settings.activeArea, options: ActiveArea.allCases, title: \.title)
+        if !top {
+            SettingRow(symbol: "rectangle.bottomhalf.inset.filled", title: "Active Area",
+                       subtitle: "Where a slide may start", active: settings.activeArea != .full) {
+                RowPicker(selection: $prefs.settings.activeArea, options: ActiveArea.allCases, title: \.title)
+            }
+        }
+        SettingRow(symbol: "keyboard", title: "Ignore While Typing", subtitle: "No mistouches from resting hands",
+                   active: settings.ignoreWhileTyping) {
+            Toggle("", isOn: $prefs.settings.ignoreWhileTyping).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
         SettingRow(symbol: "option", title: "Require Fn or ⌥", subtitle: "Only react while holding a modifier",
                    active: settings.requireModifier) {

@@ -5,10 +5,12 @@ import LedgeCore
 struct Settings: Codable, Equatable {
     var version = Settings.currentVersion
     var enabled = true
+    var sliderLayout: SliderLayout = .sides
     var leftAction: EdgeAction = .brightness
     var rightAction: EdgeAction = .volume
     var activeArea: ActiveArea = .full
     var requireModifier = false
+    var ignoreWhileTyping = true
     var tapActions: [TapZone: TapAction] = [.topRight: .mute]
     var mediaStrip = true
     var reverseMediaSwipe = false
@@ -36,10 +38,12 @@ struct Settings: Codable, Equatable {
         }
         version = value(.version, 1)
         enabled = value(.enabled, d.enabled)
+        sliderLayout = value(.sliderLayout, d.sliderLayout)
         leftAction = value(.leftAction, d.leftAction)
         rightAction = value(.rightAction, d.rightAction)
         activeArea = value(.activeArea, d.activeArea)
         requireModifier = value(.requireModifier, d.requireModifier)
+        ignoreWhileTyping = value(.ignoreWhileTyping, d.ignoreWhileTyping)
         tapActions = value(.tapActions, d.tapActions)
         mediaStrip = value(.mediaStrip, d.mediaStrip)
         reverseMediaSwipe = value(.reverseMediaSwipe, d.reverseMediaSwipe)
@@ -67,12 +71,14 @@ struct Settings: Codable, Equatable {
 
     var gestureConfig: GestureConfig {
         var config = GestureConfig()
+        config.layout = sliderLayout
         config.edgeWidth = edgeWidth
         config.activeArea = activeArea
         config.leftEdge = leftAction != .off
         config.rightEdge = rightAction != .off
         config.mediaStrip = mediaStrip
         config.tapZones = Set(tapActions.filter { $0.value != .none }.keys)
+        config.ignoreWhileTyping = ignoreWhileTyping
         return config
     }
 

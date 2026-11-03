@@ -48,6 +48,23 @@ public struct SurfaceSize: Equatable {
 
 public enum Side: String, Codable, CaseIterable { case left, right }
 
+/// Where the two sliders sit on the trackpad.
+public enum SliderLayout: String, Codable, CaseIterable, Identifiable {
+    /// Up and down along the left and right edges.
+    case sides
+    /// Left and right along the top edge, split in two halves like the Touch Bar's sliders.
+    case top
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .sides: return "Side Edges"
+        case .top: return "Top Edge"
+        }
+    }
+}
+
 /// A section of the trackpad that reacts to a double-tap.
 public enum TapZone: String, Codable, CaseIterable, Identifiable, CodingKeyRepresentable {
     case topLeft, topCenter, topRight, bottomLeft, bottomCenter, bottomRight

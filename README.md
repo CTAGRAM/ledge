@@ -50,8 +50,10 @@ no network code at all.
 | Feature | What it does |
 |---|---|
 | **Edge sliders** | Left edge for brightness and right edge for volume by default. Either edge can control brightness, volume, the keyboard backlight or nothing. Slide with one finger or two. |
+| **Touch Bar layout** | Prefer the sliders up top? Switch to **Top Edge**: the top of the trackpad splits in two, brightness on the left half and volume on the right, with empty space between. Slide left and right, like the Touch Bar. |
 | **Fast and smooth** | A slide starts after 1 mm of movement and moves in 1% steps, with a haptic tick every sixteenth like the brightness keys. Prefer coarser steps? Pick quarter or keyboard steps. Hold **⇧⌥** to slide 4× finer. |
 | **Palm proof** | Ledge reads the size of every contact from the trackpad sensor. Palms are ignored, and a thumb or palm resting on the pad doesn't stop a slide. |
+| **Typing proof** | For a moment after each key press, new touches are ignored and a finger waiting on an edge is let go, so hands resting on the trackpad while you type change nothing. |
 | **Pages stay put** | Scrolling and its momentum are held back while you slide, so the page under the pointer doesn't move. |
 | **Haptics** | A tick from the Force Touch trackpad on every step (Light, Medium or Strong), plus a firmer bump at 0%, 100% and when a tap action runs. |
 | **Pointer freeze** | The pointer hides and stays still while you slide, then comes back exactly where it was. |
@@ -59,7 +61,7 @@ no network code at all.
 | **Media strip** | Swipe along the bottom edge for the next or previous track. The direction can be reversed. |
 | **On-screen display** | The system HUD, or a matching native-style one wherever macOS won't draw it (brightness on macOS 26, keyboard light). You can also pick a slim bar at the screen edge, or nothing. |
 | **Live trackpad map** | The menu shows the zones, the tap sections, the current levels and every finger on the pad in real time, with palms in red. |
-| **Stays out of the way** | Let slides start only in the bottom ¾, ½ or ¼ of an edge, or only while holding Fn or ⌥. Ordinary pointing, scrolling and multi-finger gestures are untouched. |
+| **Stays out of the way** | Let side slides start only in the bottom ¾, ½ or ¼ of an edge, or only while holding Fn or ⌥. Ordinary pointing, scrolling and multi-finger gestures are untouched. |
 | **Every trackpad** | Built-in and Magic Trackpad, picked back up after sleep or reconnecting. A Magic Mouse is ignored. |
 | **Light** | Menu bar only, no Dock icon, about 0% CPU when idle. |
 
@@ -105,8 +107,8 @@ open /Applications/Ledge.app
 ### First launch
 
 Ledge opens a short setup guide and asks for **Accessibility** access (System Settings › Privacy &
-Security › Accessibility). It needs this to freeze the pointer, hold back page scrolling, send media
-keys and swallow the click that tap-to-click would add to a corner tap. Brightness and volume slides
+Security › Accessibility). It needs this to freeze the pointer, hold back page scrolling, notice typing,
+send media keys and swallow the click that tap-to-click would add to a corner tap. Brightness and volume slides
 work without it.
 
 Turn on **Open at Login** in Settings to have Ledge start with your Mac.
@@ -117,14 +119,23 @@ Turn on **Open at Login** in Settings to have Ledge start with your Mac.
 |---|---|---|
 | Slide up or down | Left edge | Brightness |
 | Slide up or down | Right edge | Volume |
-| Hold **⇧⌥** while sliding | Either edge | 4× finer steps |
+| Slide left or right | Top edge, left half (Top Edge layout) | Brightness |
+| Slide left or right | Top edge, right half (Top Edge layout) | Volume |
+| Hold **⇧⌥** while sliding | Any slider | 4× finer steps |
 | Swipe left or right | Bottom edge | Previous or next track |
 | Double-tap | Top-right corner | Mute or unmute (Quick Mute) |
 | Double-tap | Bottom middle | Play or pause, when turned on under Media Strip |
 | Double-tap | Any of the six sections | The action you gave it |
 
-Everything is set from the menu bar icon. The first page has the common switches, and **Settings**
-has the rest.
+Everything is set from the menu bar icon. The first page has the common switches, including
+**Sliders** to choose between the side edges and the top edge, and **Settings** has the rest.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/top-menu-dark.png">
+    <img src="docs/images/top-menu-light.png" width="396" alt="The Ledge menu in the Top Edge layout: brightness on the left half of the top strip and volume on the right half, with a gap between">
+  </picture>
+</p>
 
 <details>
 <summary><b>All settings</b></summary>
@@ -132,15 +143,17 @@ has the rest.
 
 | Setting | Options | Default |
 |---|---|---|
-| Left Edge / Right Edge | Brightness, Volume, Keyboard Light, Nothing | Brightness / Volume |
+| Sliders | Side Edges, Top Edge | Side Edges |
+| Left Edge / Right Edge (Top Left / Top Right) | Brightness, Volume, Keyboard Light, Nothing | Brightness / Volume |
 | Swap Sides | Swaps the two edges | |
-| Active Area | Whole edge, Bottom ¾, Bottom half, Bottom quarter | Whole edge |
+| Active Area | Side edges only: Whole edge, Bottom ¾, Bottom half, Bottom quarter | Whole edge |
+| Ignore While Typing | Touches right after a key press do nothing | On |
 | Require Fn or ⌥ | Only react while a modifier is held | Off |
 | Haptic Feedback | Off, Light, Medium, Strong | Medium |
 | Quick Mute | Double-tap the top-right corner to mute | On |
 | Media Strip | Swipe the bottom edge to skip; also Double-tap to Play/Pause and Reverse Swipe | On |
 | Sensitivity | How far a slide moves the level | 1.5× |
-| Edge Width | How wide each edge zone is | 7% |
+| Edge Width | How thick each slider zone is | 7% |
 | Freeze Pointer | Pointer stays hidden and still while sliding | On |
 | Stop Page Scrolling | Pages stay put under a slide | On |
 | Steps | Smooth, Quarter Steps, Keyboard Steps | Smooth |
@@ -242,7 +255,8 @@ state:
 - **Haptics** use the trackpad's `MTActuator`, with actuation IDs found by
   [HapticKey](https://github.com/niw/HapticKey), and fall back to `NSHapticFeedbackManager`.
 - **Pointer freeze, scroll blocking and click swallowing** run in a HID-level `CGEventTap` on its own
-  thread, so the pointer never waits on the UI.
+  thread, so the pointer never waits on the UI. The same tap notices *that* a key was pressed, never
+  which one, so the edges can rest while you type.
 
 Private APIs can change between macOS releases. Everything that isn't essential is looked up at
 runtime, so a missing piece turns one feature off instead of stopping the app from launching.

@@ -29,11 +29,18 @@ struct TrackpadMapView: View {
                 if settings.mediaStrip { mediaStrip(size: size, surface: surface) }
                 sections(size: size, surface: surface)
 
-                edgeZone(.left, width: edgeWidth, size: size)
-                edgeZone(.right, width: edgeWidth, size: size)
-                    .offset(x: size.width - edgeWidth)
-
-                readouts(size: size, edgeWidth: edgeWidth)
+                switch settings.sliderLayout {
+                case .sides:
+                    edgeZone(.left, width: edgeWidth, size: size)
+                    edgeZone(.right, width: edgeWidth, size: size)
+                        .offset(x: size.width - edgeWidth)
+                    readouts(size: size, inset: edgeWidth + 12, top: size.height * 0.22)
+                case .top:
+                    topSlider(.left, size: size, surface: surface)
+                    topSlider(.right, size: size, surface: surface)
+                    let depth = EdgeGestureRecognizer.sliderRect(.left, config: settings.gestureConfig, on: surface).minY
+                    readouts(size: size, inset: 16, top: max(12, (1 - depth) * size.height) + 14)
+                }
 
                 ForEach(model.touches, id: \.id) { touch in
                     contact(touch)
@@ -66,6 +73,28 @@ struct TrackpadMapView: View {
             topLeadingRadius: edge == .left ? 14 : 0, bottomLeadingRadius: edge == .left ? 14 : 0,
             bottomTrailingRadius: edge == .right ? 14 : 0, topTrailingRadius: edge == .right ? 14 : 0,
             style: .continuous))
+        .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.9), value: level)
+    }
+
+    /// One half of the top strip, filling from the left like the Touch Bar's sliders.
+    private func topSlider(_ side: Side, size: CGSize, surface: SurfaceSize) -> some View {
+        let action = settings.action(for: side)
+        let level = model.value(for: action) ?? 0
+        let active = model.activeEdge == side
+        let r = EdgeGestureRecognizer.sliderRect(side, config: settings.gestureConfig, on: surface)
+        let width = (r.maxX - r.minX) * size.width
+        return ZStack(alignment: .leading) {
+            Rectangle().fill(action.tint.opacity(action == .off ? 0 : 0.12))
+            Rectangle()
+                .fill(action.tint.gradient.opacity(action == .off ? 0 : (active ? 0.95 : 0.7)))
+                .frame(width: width * level)
+        }
+        .frame(width: width, height: max(12, (r.maxY - r.minY) * size.height))
+        .clipShape(UnevenRoundedRectangle(
+            topLeadingRadius: side == .left ? 14 : 0, bottomLeadingRadius: side == .left ? 0 : 4,
+            bottomTrailingRadius: side == .right ? 0 : 4, topTrailingRadius: side == .right ? 14 : 0,
+            style: .continuous))
+        .offset(x: r.minX * size.width)
         .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.9), value: level)
     }
 
@@ -113,14 +142,14 @@ struct TrackpadMapView: View {
         }
     }
 
-    private func readouts(size: CGSize, edgeWidth: CGFloat) -> some View {
+    private func readouts(size: CGSize, inset: CGFloat, top: CGFloat) -> some View {
         HStack(alignment: .top) {
             readout(.left, alignment: .leading)
             Spacer()
             readout(.right, alignment: .trailing)
         }
-        .padding(.horizontal, edgeWidth + 12)
-        .padding(.top, size.height * 0.22)
+        .padding(.horizontal, inset)
+        .padding(.top, top)
         .frame(width: size.width)
     }
 

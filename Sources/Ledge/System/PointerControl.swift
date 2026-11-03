@@ -3,12 +3,15 @@ import LedgePrivate
 
 /// Holds the pointer still (and hidden) during a slide, keeps pages from scrolling
 /// under a slide, and swallows the tap-to-click clicks that section taps would produce.
+/// It also notices key presses (never which key) so the edges can rest while you type.
 ///
 /// The event tap runs on its own thread so pointer movement never waits for the UI.
 /// Needs Accessibility access.
 final class PointerControl {
     /// Called on the main thread for every left mouse-down.
     var onMouseDown: () -> Void = {}
+    /// Called on the main thread for every key press.
+    var onKeyDown: () -> Void = {}
 
     var hidesPointer = true
 
@@ -42,7 +45,7 @@ final class PointerControl {
     func start() -> Bool {
         guard tap == nil else { return true }
         var mask = CGEventMask(0)
-        for type in [CGEventType.mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown, .leftMouseUp, .scrollWheel] {
+        for type in [CGEventType.mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown, .leftMouseUp, .scrollWheel, .keyDown] {
             mask |= 1 << type.rawValue
         }
         mask |= 1 << 29 // NSEventTypeGesture: trackpad swipes and pinches
@@ -139,6 +142,9 @@ final class PointerControl {
                 return state.swallowingClick
             }
             return swallow ? nil : pass
+        case .keyDown:
+            DispatchQueue.main.async { [weak self] in self?.onKeyDown() }
+            return pass
         default:
             if type.rawValue == 29 { return shared.read { $0.blockScrolling || $0.frozen } ? nil : pass }
             return pass

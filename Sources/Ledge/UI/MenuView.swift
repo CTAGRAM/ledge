@@ -61,6 +61,10 @@ struct MainMenuView: View {
                 .opacity(settings.enabled ? 1 : 0.45)
 
             VStack(spacing: 6) {
+                SettingRow(symbol: settings.sliderLayout == .top ? "slider.horizontal.3" : "slider.vertical.3", title: "Sliders",
+                           subtitle: settings.sliderLayout == .top ? "Like the Touch Bar" : "Up and down the sides") {
+                    RowPicker(selection: $prefs.settings.sliderLayout, options: SliderLayout.allCases, title: \.title)
+                }
                 SettingRow(symbol: "hand.tap.fill", title: "Haptic Feedback", subtitle: "A tick for every step", active: settings.haptics != .off) {
                     RowPicker(selection: $prefs.settings.haptics, options: HapticStrength.allCases, title: \.title)
                 }
@@ -108,7 +112,7 @@ struct MainMenuView: View {
                             value: $prefs.settings.sensitivity, range: 0.5...3, step: 0.25) {
                     String(format: "%g×", $0)
                 }
-                ValueSlider(symbol: "arrow.left.and.right", title: "Edge Width",
+                ValueSlider(symbol: settings.sliderLayout == .top ? "arrow.up.and.down" : "arrow.left.and.right", title: "Edge Width",
                             value: $prefs.settings.edgeWidth, range: 0.03...0.15, step: 0.01) {
                     "\(Int(($0 * 100).rounded()))%"
                 }

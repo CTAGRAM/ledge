@@ -56,6 +56,12 @@ final class EdgeController {
             let now = ProcessInfo.processInfo.systemUptime
             self?.recognizers.values.forEach { $0.noteMouseDown(at: now) }
         }
+        pointer.onKeyDown = { [weak self] in
+            guard let self else { return }
+            let now = ProcessInfo.processInfo.systemUptime
+            recognizers.values.forEach { $0.noteKeyDown(at: now) }
+            updatePointerGuards()
+        }
 
         prefs.$settings
             .sink { [weak self] settings in self?.apply(settings) }
