@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import LedgeCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -245,6 +246,8 @@ private struct KeyRecorder: View {
     @Binding var combo: KeyCombo
     @State private var recording = false
     @State private var monitor: Any?
+    /// System shortcuts such as ⌘⇧3 are paused while recording, or macOS would take them first.
+    @State private var systemShortcutsPaused: UnsafeMutableRawPointer?
 
     var body: some View {
         Button {
@@ -259,6 +262,7 @@ private struct KeyRecorder: View {
 
     private func start() {
         recording = true
+        systemShortcutsPaused = PushSymbolicHotKeyMode(OptionBits(kHIHotKeyModeAllDisabled))
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             combo = Self.combo(from: event)
             stop()
@@ -270,6 +274,8 @@ private struct KeyRecorder: View {
         recording = false
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if let systemShortcutsPaused { PopSymbolicHotKeyMode(systemShortcutsPaused) }
+        systemShortcutsPaused = nil
     }
 
     private static func combo(from event: NSEvent) -> KeyCombo {
@@ -291,6 +297,7 @@ private struct KeyRecorder: View {
             101: "F9", 109: "F10", 103: "F11", 111: "F12",
         ]
         if let name = special[event.keyCode] { return name }
-        return (event.charactersIgnoringModifiers ?? "?").uppercased()
+        // Without Shift applied, so ⇧3 reads as 3 rather than #.
+        return (event.characters(byApplyingModifiers: []) ?? event.charactersIgnoringModifiers ?? "?").uppercased()
     }
 }

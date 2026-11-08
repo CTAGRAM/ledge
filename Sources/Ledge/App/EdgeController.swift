@@ -203,6 +203,10 @@ final class EdgeController {
         case .doubleTap(let zone):
             log.notice("double-tap in \(zone.rawValue, privacy: .public)")
             run(prefs.settings.tapAction(for: zone), device: device)
+        case .pullDown:
+            log.notice("pull-down from the top")
+            SystemActions.toggleControlCenter()
+            haptics.bump(on: device.multitouchID)
         }
     }
 

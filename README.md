@@ -58,6 +58,7 @@ no network code at all.
 | **Haptics** | A tick from the Force Touch trackpad on every step (Light, Medium or Strong), plus a firmer bump at 0%, 100% and when a tap action runs. |
 | **Pointer freeze** | The pointer hides and stays still while you slide, then comes back exactly where it was. |
 | **Tap sections** | Double-tap any of six areas (four corners, top middle, bottom middle) to open an app, run a Shortcut, start a timer, press keys, open a link or run a command. [More below](#tap-sections). |
+| **Control Center swipe** | Swipe down with two fingers from the top edge to open Control Center, like on an iPhone. Turn it on in the menu. |
 | **Media strip** | Swipe along the bottom edge for the next or previous track. The direction can be reversed. |
 | **On-screen display** | The system HUD, or a matching native-style one wherever macOS won't draw it (brightness on macOS 26, keyboard light). You can also pick a slim bar at the screen edge, or nothing. |
 | **Live trackpad map** | The menu shows the zones, the tap sections, the current levels and every finger on the pad in real time, with palms in red. |
@@ -123,6 +124,7 @@ Turn on **Open at Login** in Settings to have Ledge start with your Mac.
 | Slide left or right | Top edge, right half (Top Edge layout) | Volume |
 | Hold **⇧⌥** while sliding | Any slider | 4× finer steps |
 | Swipe left or right | Bottom edge | Previous or next track |
+| Swipe down with two fingers | From the top edge (Control Center Swipe) | Opens or closes Control Center |
 | Double-tap | Top-right corner | Mute or unmute (Quick Mute) |
 | Double-tap | Bottom middle | Play or pause, when turned on under Media Strip |
 | Double-tap | Any of the six sections | The action you gave it |
@@ -151,6 +153,7 @@ Everything is set from the menu bar icon. The first page has the common switches
 | Require Fn or ⌥ | Only react while a modifier is held | Off |
 | Haptic Feedback | Off, Light, Medium, Strong | Medium |
 | Quick Mute | Double-tap the top-right corner to mute | On |
+| Control Center Swipe | Two fingers down from the top open Control Center | Off |
 | Media Strip | Swipe the bottom edge to skip; also Double-tap to Play/Pause and Reverse Swipe | On |
 | Sensitivity | How far a slide moves the level | 1.5× |
 | Edge Width | How thick each slider zone is | 7% |
@@ -180,7 +183,7 @@ does:
 |---|---|
 | Media | Mute / Unmute, Play / Pause, Next Track, Previous Track |
 | System | Mission Control, Show Desktop, Lock Screen, Screenshot |
-| Open & run | Open App, Run Shortcut, Open Link or File, Press Keys (record any combination), Run Command (zsh), Start Timer |
+| Open & run | Open App, Run Shortcut, Open Link or File, Press Keys (record any combination, including system shortcuts such as ⌘⇧3), Run Command (zsh), Start Timer |
 
 **Try It** runs the action right away, and a small confirmation appears on screen whenever one runs.
 
@@ -248,6 +251,8 @@ state:
   their position and size. `EdgeGestureRecognizer`, a pure Swift and unit-tested type in
   `LedgeCore`, turns those contacts into slides, swipes and taps. It uses each contact's size to
   reject palms, and its timing to tell a resting finger from a new gesture.
+- **Control Center** opens with the same Globe (fn) + C shortcut macOS offers, so it works in full
+  screen too.
 - **Volume** goes through CoreAudio on the default output device. **Brightness** uses
   `DisplayServices`, and the **keyboard light** uses `CoreBrightness`.
 - **The on-screen display** uses `OSD.framework`, with a SwiftUI fallback where macOS doesn't draw

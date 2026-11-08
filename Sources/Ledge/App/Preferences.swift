@@ -11,6 +11,7 @@ struct Settings: Codable, Equatable {
     var activeArea: ActiveArea = .full
     var requireModifier = false
     var ignoreWhileTyping = true
+    var controlCenterSwipe = false
     var tapActions: [TapZone: TapAction] = [.topRight: .mute]
     var mediaStrip = true
     var reverseMediaSwipe = false
@@ -44,6 +45,7 @@ struct Settings: Codable, Equatable {
         activeArea = value(.activeArea, d.activeArea)
         requireModifier = value(.requireModifier, d.requireModifier)
         ignoreWhileTyping = value(.ignoreWhileTyping, d.ignoreWhileTyping)
+        controlCenterSwipe = value(.controlCenterSwipe, d.controlCenterSwipe)
         tapActions = value(.tapActions, d.tapActions)
         mediaStrip = value(.mediaStrip, d.mediaStrip)
         reverseMediaSwipe = value(.reverseMediaSwipe, d.reverseMediaSwipe)
@@ -79,6 +81,7 @@ struct Settings: Codable, Equatable {
         config.mediaStrip = mediaStrip
         config.tapZones = Set(tapActions.filter { $0.value != .none }.keys)
         config.ignoreWhileTyping = ignoreWhileTyping
+        config.pullDown = controlCenterSwipe
         return config
     }
 

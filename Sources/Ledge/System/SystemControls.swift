@@ -127,12 +127,38 @@ enum SystemActions {
 
     /// Same as pressing ⌃⌘Q.
     static func lockScreen() {
+        KeyPress.post(12, modifiers: [.maskCommand, .maskControl])
+    }
+
+    /// Same as pressing Globe (fn) + C, which opens or closes Control Center, even in full screen.
+    static func toggleControlCenter() {
+        KeyPress.post(8, modifiers: .maskSecondaryFn)
+    }
+}
+
+/// Posts a key press the way a keyboard does: modifier keys go down first and come up last.
+/// System shortcuts such as ⌘⇧3 or fn-C ignore a key that only carries modifier flags.
+enum KeyPress {
+    static func post(_ key: CGKeyCode, modifiers: CGEventFlags) {
         let source = CGEventSource(stateID: .hidSystemState)
-        let qKey: CGKeyCode = 12
-        for isDown in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: qKey, keyDown: isDown)
-            event?.flags = [.maskCommand, .maskControl]
+        let modifierKeys: [(key: CGKeyCode, flag: CGEventFlags)] = [
+            (63, .maskSecondaryFn), (59, .maskControl), (58, .maskAlternate), (56, .maskShift), (55, .maskCommand),
+        ].filter { modifiers.contains($0.flag) }
+        var held = CGEventFlags()
+        func post(_ key: CGKeyCode, down: Bool) {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
+            event?.flags = held
             event?.post(tap: .cghidEventTap)
+        }
+        for modifier in modifierKeys {
+            held.insert(modifier.flag)
+            post(modifier.key, down: true)
+        }
+        post(key, down: true)
+        post(key, down: false)
+        for modifier in modifierKeys.reversed() {
+            held.remove(modifier.flag)
+            post(modifier.key, down: false)
         }
     }
 }

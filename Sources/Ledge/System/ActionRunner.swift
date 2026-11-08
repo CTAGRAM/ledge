@@ -45,7 +45,7 @@ enum ActionRunner {
             return nil
         case .keyboardShortcut(let combo):
             guard !combo.display.isEmpty else { return "No keys recorded" }
-            press(combo)
+            KeyPress.post(combo.keyCode, modifiers: CGEventFlags(rawValue: combo.modifiers))
             return nil
         case .shellCommand(let command):
             guard !command.trimmingCharacters(in: .whitespaces).isEmpty else { return "No command set" }
@@ -69,15 +69,6 @@ enum ActionRunner {
         }
         if let url = URL(string: trimmed), url.scheme != nil { return url }
         return URL(string: "https://" + trimmed)
-    }
-
-    private static func press(_ combo: KeyCombo) {
-        let source = CGEventSource(stateID: .hidSystemState)
-        for isDown in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: combo.keyCode, keyDown: isDown)
-            event?.flags = CGEventFlags(rawValue: combo.modifiers)
-            event?.post(tap: .cghidEventTap)
-        }
     }
 
     private static func launch(_ executable: String, _ arguments: [String]) {

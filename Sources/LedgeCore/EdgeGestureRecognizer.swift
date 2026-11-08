@@ -14,6 +14,8 @@ public struct GestureConfig: Equatable {
     public var tapZones: Set<TapZone> = [.topRight]
     /// Touches that land just after a key press are resting palms or thumbs, not gestures.
     public var ignoreWhileTyping = true
+    /// Two fingers swiped down from the top edge, like opening Control Center on an iPhone.
+    public var pullDown = false
 
     public init() {}
 }
@@ -26,6 +28,8 @@ public enum GestureEvent: Equatable {
     case slideEnded(Side)
     case mediaSwipe(forward: Bool)
     case doubleTap(TapZone)
+    /// Two fingers swiped down from the top edge.
+    case pullDown
 }
 
 /// Turns raw touch frames from one surface into edge gestures.
@@ -58,6 +62,10 @@ public final class EdgeGestureRecognizer {
         public var topGapMM = 24.0
         /// How long after a key press new touches are ignored.
         public var typingGuard = 0.75
+        /// A pull-down starts with both fingers this close to the top edge…
+        public var pullDownZoneMM = 8.0
+        /// …and fires after they travel this far down.
+        public var pullDownMM = 10.0
         public init() {}
     }
 
@@ -75,11 +83,11 @@ public final class EdgeGestureRecognizer {
     // MARK: State
 
     private enum Kind: Hashable {
-        case slide(Side), swipe, tap(TapZone)
+        case slide(Side), swipe, tap(TapZone), pullDown
     }
 
     private enum Mode {
-        case pending, sliding(Side), swiping(fired: Bool)
+        case pending, sliding(Side), swiping(fired: Bool), pulledDown
     }
 
     private struct Tracked {
@@ -96,6 +104,8 @@ public final class EdgeGestureRecognizer {
         var hoverStart: Double?
 
         var isPending: Bool { if case .pending = mode { return true } else { return false } }
+        /// Two fingers at the top that may still pull down.
+        var isPullDown: Bool { isPending && kinds == [.pullDown] && !siblings.isEmpty }
         var slideSides: [Side] { kinds.compactMap { if case .slide(let side) = $0 { return side } else { return nil } } }
         var tapZone: TapZone? { kinds.lazy.compactMap { if case .tap(let zone) = $0 { return zone } else { return nil } }.first }
     }
@@ -122,12 +132,14 @@ public final class EdgeGestureRecognizer {
     /// True while a finger that may become a gesture is down.
     public var isTracking: Bool { tracked != nil }
 
-    /// True while scrolling should be held back: during a slide, or while a finger on a
-    /// slider may still become one (otherwise two fingers on a side edge scroll the page).
+    /// True while scrolling should be held back: during a slide or pull-down, or while fingers may
+    /// still become one (otherwise two fingers on a side edge or at the top scroll the page).
     public var blocksScrolling: Bool {
         if isSliding { return true }
-        guard let tracked, tracked.isPending else { return false }
-        return !tracked.slideSides.isEmpty
+        guard let tracked else { return false }
+        if case .pulledDown = tracked.mode { return true }
+        guard tracked.isPending else { return false }
+        return !tracked.slideSides.isEmpty || tracked.isPullDown
     }
 
     /// True when a slide lost its finger and `tick` must be called to finish it.
@@ -268,7 +280,12 @@ public final class EdgeGestureRecognizer {
         let bottomStrip = min(0.2, max(0.04, config.edgeWidth * surface.widthMM / surface.heightMM))
         if config.mediaStrip, touch.y <= bottomStrip { kinds.insert(.swipe) }
         if let zone = tapZone(at: touch), config.tapZones.contains(zone) { kinds.insert(.tap(zone)) }
+        if config.pullDown, inPullDownZone(touch) { kinds.insert(.pullDown) }
         return kinds
+    }
+
+    private func inPullDownZone(_ touch: Touch) -> Bool {
+        touch.y >= 1 - tuning.pullDownZoneMM / surface.heightMM
     }
 
     private func isPalm(_ touch: Touch) -> Bool {
@@ -331,6 +348,15 @@ public final class EdgeGestureRecognizer {
             } else if current.kinds.contains(.swipe), abs(dxMM) >= tuning.slideStartMM, abs(dxMM) > abs(dyMM) {
                 current.mode = .swiping(fired: false)
                 events += swipe(&current, dxMM: dxMM)
+            } else if current.isPullDown {
+                if -dyMM >= tuning.pullDownMM, -dyMM > abs(dxMM) {
+                    current.mode = .pulledDown
+                    events.append(.pullDown)
+                } else if dyMM > tuning.tapMaxMoveMM || abs(dxMM) > tuning.rejectMM {
+                    // Moving up or sideways: an ordinary scroll that started near the top.
+                    abandon(current)
+                    return events
+                }
             } else if moved >= tuning.rejectMM || (moved > tuning.tapMaxMoveMM && current.slideSides.isEmpty && !current.kinds.contains(.swipe)) {
                 abandon(current)
                 return events
@@ -340,6 +366,8 @@ public final class EdgeGestureRecognizer {
             if delta != 0 { events.append(.slideMoved(edge, deltaMM: delta)) }
         case .swiping:
             events += swipe(&current, dxMM: dxMM)
+        case .pulledDown:
+            break
         }
         current.lastX = touch.x
         current.lastY = touch.y
@@ -373,6 +401,16 @@ public final class EdgeGestureRecognizer {
         }
 
         if var current = tracked {
+            // A second finger landing next to the first at the very top makes a pull-down.
+            if config.pullDown, current.isPending, current.kinds.contains(.pullDown), current.siblings.isEmpty,
+               time - current.startTime < tuning.restingAfter, let second = fresh.first(where: inPullDownZone) {
+                current.siblings.insert(second.id)
+                current.kinds = [.pullDown]
+                tracked = current
+                fresh.removeAll { $0.id == second.id }
+                if fresh.isEmpty { return events }
+            }
+
             // Fingers landing on the same edge as a slide join it. The top strip is slid with one
             // finger; a second finger there is the start of a scroll.
             let sides = current.slideSides
@@ -405,19 +443,20 @@ public final class EdgeGestureRecognizer {
             .allSatisfy { time - (firstSeen[$0.id] ?? time) >= tuning.restingAfter }
         let primary = fresh[0]
         let sameEdge = config.layout == .sides && Side.allCases.contains { side in fresh.allSatisfy { onSlider(side, $0) } }
-        if othersResting, fresh.count == 1 || sameEdge {
-            begin(primary, siblings: Set(fresh.dropFirst().map(\.id)), at: time)
+        let pullingDown = config.pullDown && fresh.count == 2 && fresh.allSatisfy(inPullDownZone)
+        if othersResting, fresh.count == 1 || sameEdge || pullingDown {
+            begin(primary, siblings: Set(fresh.dropFirst().map(\.id)), pullDown: pullingDown && !sameEdge, at: time)
         } else {
             ignored.formUnion(freshIDs)
         }
         return events
     }
 
-    private func begin(_ touch: Touch, siblings: Set<Int32>, at time: Double) {
+    private func begin(_ touch: Touch, siblings: Set<Int32>, pullDown: Bool = false, at time: Double) {
         var kinds = kinds(for: touch)
         if !siblings.isEmpty {
-            // Two fingers together only make sense as a slide.
-            kinds = kinds.filter { if case .slide = $0 { return true } else { return false } }
+            // Two fingers together only make sense as a slide, or as a pull-down from the top.
+            kinds = pullDown ? [.pullDown] : kinds.filter { if case .slide = $0 { return true } else { return false } }
         }
         let typing = config.ignoreWhileTyping && time - lastKeyDown < tuning.typingGuard
         guard !kinds.isEmpty, !typing, gesturesAllowed() else {
@@ -444,7 +483,7 @@ public final class EdgeGestureRecognizer {
             // The trackpad sometimes drops a finger mid-slide; give it a moment to come back.
             lost = (current, edge, time)
             return []
-        case .swiping:
+        case .swiping, .pulledDown:
             return []
         case .pending:
             guard let zone = current.tapZone else { return [] }

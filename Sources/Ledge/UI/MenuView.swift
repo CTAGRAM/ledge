@@ -73,6 +73,11 @@ struct MainMenuView: View {
                     Toggle("", isOn: tapBinding(.topRight, .mute))
                         .labelsHidden().toggleStyle(.switch).controlSize(.small)
                 }
+                SettingRow(symbol: "switch.2", title: "Control Center Swipe", subtitle: "Two fingers down from the top",
+                           active: settings.controlCenterSwipe) {
+                    Toggle("", isOn: $prefs.settings.controlCenterSwipe)
+                        .labelsHidden().toggleStyle(.switch).controlSize(.small)
+                }
                 SettingRow(symbol: "square.grid.3x2.fill", title: "Tap Sections",
                            subtitle: sectionsSummary(settings), active: settings.tapActions.values.contains { $0 != .none }) {
                     Button("Edit…", action: actions.showSections).controlSize(.small)

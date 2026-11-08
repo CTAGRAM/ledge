@@ -418,6 +418,73 @@ final class EdgeGestureRecognizerTests: XCTestCase {
         r.noteKeyDown(at: 1.0)
         XCTAssertEqual(play(r, [(0.98, 0.3), (0.98, 0.4)], start: 1.1).first, .slideBegan(.right))
     }
+
+    // MARK: Pull down from the top
+
+    /// Plays two fingers side by side, moving together; `points` is the left finger's path.
+    private func playPair(_ r: EdgeGestureRecognizer, _ points: [(Double, Double)], gap: Double = 0.1,
+                          secondLandsLate: Bool = false) -> [GestureEvent] {
+        var events: [GestureEvent] = []
+        var t = 0.0
+        for (i, (x, y)) in points.enumerated() {
+            var touches = [Touch(id: 1, x: x, y: y)]
+            if !(secondLandsLate && i == 0) { touches.append(Touch(id: 2, x: x + gap, y: y)) }
+            events += r.process(touches, at: t)
+            t += 0.02
+        }
+        let (x, y) = points.last!
+        events += r.process([Touch(id: 1, x: x, y: y, phase: .lifted), Touch(id: 2, x: x + gap, y: y, phase: .lifted)], at: t)
+        events += r.process([], at: t + 0.02)
+        return events
+    }
+
+    func testTwoFingersSwipingDownFromTheTopPullDown() {
+        let r = recognizer { $0.pullDown = true }
+        XCTAssertEqual(r.process([Touch(id: 1, x: 0.4, y: 0.97), Touch(id: 2, x: 0.5, y: 0.97)], at: 0), [])
+        XCTAssertTrue(r.blocksScrolling)
+        let events = playPair(r, [(0.4, 0.97), (0.4, 0.92), (0.4, 0.85), (0.4, 0.7)])
+        XCTAssertEqual(events, [.pullDown])
+    }
+
+    func testSecondFingerLandingJustAfterStillPullsDown() {
+        let r = recognizer { $0.pullDown = true }
+        XCTAssertEqual(playPair(r, [(0.4, 0.97), (0.4, 0.96), (0.4, 0.9), (0.4, 0.8)], secondLandsLate: true), [.pullDown])
+    }
+
+    func testPullDownIsOffByDefault() {
+        let r = recognizer()
+        XCTAssertEqual(playPair(r, [(0.4, 0.97), (0.4, 0.9), (0.4, 0.8)]), [])
+    }
+
+    func testOneFingerSwipingDownFromTheTopDoesNothing() {
+        let r = recognizer { $0.pullDown = true }
+        XCTAssertEqual(play(r, [(0.4, 0.97), (0.4, 0.9), (0.4, 0.8)]), [])
+    }
+
+    func testTwoFingersFromLowerDownAreAScroll() {
+        let r = recognizer { $0.pullDown = true }
+        XCTAssertEqual(playPair(r, [(0.4, 0.8), (0.4, 0.7), (0.4, 0.6)]), [])
+        XCTAssertFalse(r.blocksScrolling)
+    }
+
+    func testTwoFingersMovingUpFromTheTopScrollAsUsual() {
+        let r = recognizer { $0.pullDown = true }
+        _ = r.process([Touch(id: 1, x: 0.4, y: 0.95), Touch(id: 2, x: 0.5, y: 0.95)], at: 0)
+        XCTAssertEqual(r.process([Touch(id: 1, x: 0.4, y: 0.98), Touch(id: 2, x: 0.5, y: 0.98)], at: 0.02), [])
+        XCTAssertFalse(r.blocksScrolling)
+    }
+
+    func testPullDownKeepsTwoFingerEdgeSlides() {
+        let r = recognizer { $0.pullDown = true }
+        var events = r.process([Touch(id: 1, x: 0.02, y: 0.95), Touch(id: 2, x: 0.03, y: 0.85)], at: 0)
+        events += r.process([Touch(id: 1, x: 0.02, y: 0.85), Touch(id: 2, x: 0.03, y: 0.75)], at: 0.02)
+        XCTAssertEqual(events.first, .slideBegan(.left))
+    }
+
+    func testPullDownKeepsTopEdgeSlides() {
+        let r = recognizer { $0.layout = .top; $0.pullDown = true }
+        XCTAssertEqual(play(r, [(0.1, 0.97), (0.12, 0.97), (0.3, 0.96)]).first, .slideBegan(.left))
+    }
 }
 
 final class StepAccumulatorTests: XCTestCase {
